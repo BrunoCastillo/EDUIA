@@ -1,9 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+
 // Configuración de Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
 
 // Configuración de DeepSeek
 const deepseekApiKey = process.env.REACT_APP_DEEPSEEK_API_KEY;
+const deepseekApiUrl = process.env.REACT_APP_DEEPSEEK_API_URL;
 
 // Debug: Mostrar las variables (sin mostrar las claves completas)
 console.log('=== DEBUG: Configuración ===');
@@ -38,10 +41,13 @@ if (!deepseekApiKey) {
     console.error('2. Has reiniciado el servidor de desarrollo después de modificar el archivo .env');
 }
 
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
 export const config = {
     supabaseUrl,
     supabaseKey,
     deepseekApiKey,
+    deepseekApiUrl,
     isSupabaseConfigured: Boolean(supabaseUrl && supabaseKey),
     isDeepSeekConfigured: Boolean(deepseekApiKey)
 }; 

@@ -19,10 +19,26 @@ CREATE TABLE IF NOT EXISTS subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     code TEXT UNIQUE NOT NULL,
-    professor_id UUID REFERENCES users(id) NOT NULL,
+    professor_id UUID REFERENCES auth.users(id) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Crear políticas de seguridad
+CREATE POLICY "Users can insert their own subjects"
+ON subjects FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = professor_id);
+
+CREATE POLICY "Users can view their own subjects"
+ON subjects FOR SELECT
+TO authenticated
+USING (auth.uid() = professor_id);
+
+CREATE POLICY "Users can delete their own subjects"
+ON subjects FOR DELETE
+TO authenticated
+USING (auth.uid() = professor_id);
 
 -- Tabla de inscripciones
 CREATE TABLE IF NOT EXISTS enrollments (

@@ -5,7 +5,13 @@ class SubjectService {
         try {
             const { data, error } = await supabase
                 .from('subjects')
-                .select('*')
+                .select(`
+                    *,
+                    syllabus (
+                        file_url,
+                        file_name
+                    )
+                `)
                 .eq('professor_id', professorId)
                 .order('created_at', { ascending: false });
 
@@ -109,22 +115,41 @@ class SubjectService {
 
             console.log('Intentando crear asignatura con datos:', subjectToCreate);
 
-            const { data, error } = await supabase
+            const { data: subject, error: subjectError } = await supabase
                 .from('subjects')
                 .insert([subjectToCreate])
                 .select()
                 .single();
 
-            if (error) {
-                console.error('Error al crear asignatura:', error);
-                if (error.code === '42501') {
+            if (subjectError) {
+                console.error('Error al crear asignatura:', subjectError);
+                if (subjectError.code === '42501') {
                     throw new Error('No tienes permiso para crear asignaturas');
                 }
-                throw error;
+                throw subjectError;
             }
 
-            console.log('Asignatura creada exitosamente:', data);
-            return data;
+            console.log('Asignatura creada exitosamente:', subject);
+
+            // Si hay una URL de sílabo, actualizar la asignatura
+            if (subjectData.syllabus_url) {
+                const { error: syllabusError } = await supabase
+                    .from('syllabus')
+                    .insert([
+                        {
+                            subject_id: subject.id,
+                            file_url: subjectData.syllabus_url,
+                            file_name: 'Sílabo',
+                            file_path: subjectData.syllabus_url
+                        }
+                    ]);
+
+                if (syllabusError) {
+                    console.error('Error al guardar el sílabo:', syllabusError);
+                }
+            }
+
+            return subject;
         } catch (error) {
             console.error('Error en createSubject:', error);
             throw error;
@@ -244,18 +269,18 @@ class SubjectService {
                 .from('subjects')
                 .update({
                     name: subjectData.name,
-                    description: subjectData.description,
-                    code: subjectData.code
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', subjectId)
-                .select();
+                .select()
+                .single();
 
             if (error) {
                 console.error('Error de Supabase:', error);
                 throw error;
             }
 
-            return data[0];
+            return data;
         } catch (error) {
             console.error('Error al actualizar la asignatura:', error);
             throw error;

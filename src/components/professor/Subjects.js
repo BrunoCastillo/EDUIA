@@ -9,6 +9,7 @@ export const Subjects = ({ professorId }) => {
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [notification, setNotification] = useState(null);
+    const [editingSubject, setEditingSubject] = useState(null);
 
     useEffect(() => {
         loadSubjects();
@@ -54,6 +55,29 @@ export const Subjects = ({ professorId }) => {
         }
     };
 
+    const handleEditSubject = async (subjectData) => {
+        try {
+            setError(null);
+            const updatedSubject = await subjectService.updateSubject(editingSubject.id, subjectData);
+            setSubjects(subjects.map(subject => 
+                subject.id === updatedSubject.id ? updatedSubject : subject
+            ));
+            setEditingSubject(null);
+            setShowForm(false);
+            setNotification({
+                type: 'success',
+                message: 'Asignatura actualizada exitosamente'
+            });
+        } catch (error) {
+            console.error('Error al actualizar asignatura:', error);
+            setError(error.message || 'Error al actualizar la asignatura. Por favor, intente nuevamente.');
+            setNotification({
+                type: 'error',
+                message: error.message || 'Error al actualizar la asignatura'
+            });
+        }
+    };
+
     const handleDeleteSubject = async (subjectId) => {
         try {
             setError(null);
@@ -71,6 +95,11 @@ export const Subjects = ({ professorId }) => {
                 message: 'Error al eliminar la asignatura'
             });
         }
+    };
+
+    const handleEditClick = (subject) => {
+        setEditingSubject(subject);
+        setShowForm(true);
     };
 
     if (loading) {
@@ -95,7 +124,10 @@ export const Subjects = ({ professorId }) => {
                 <h2>Mis Asignaturas</h2>
                 <button 
                     className="add-subject-button"
-                    onClick={() => setShowForm(!showForm)}
+                    onClick={() => {
+                        setEditingSubject(null);
+                        setShowForm(!showForm);
+                    }}
                 >
                     {showForm ? 'Cancelar' : 'Nueva Asignatura'}
                 </button>
@@ -105,8 +137,12 @@ export const Subjects = ({ professorId }) => {
 
             {showForm && (
                 <SubjectForm 
-                    onSubmit={handleCreateSubject}
-                    onCancel={() => setShowForm(false)}
+                    onSubmit={editingSubject ? handleEditSubject : handleCreateSubject}
+                    onCancel={() => {
+                        setShowForm(false);
+                        setEditingSubject(null);
+                    }}
+                    initialData={editingSubject}
                 />
             )}
 
@@ -130,6 +166,12 @@ export const Subjects = ({ professorId }) => {
                                 <p className="subject-description">{subject.description}</p>
                             </div>
                             <div className="subject-actions">
+                                <button 
+                                    className="edit-button"
+                                    onClick={() => handleEditClick(subject)}
+                                >
+                                    Editar
+                                </button>
                                 <button 
                                     className="delete-button"
                                     onClick={() => handleDeleteSubject(subject.id)}

@@ -8,19 +8,41 @@ const SyllabusUpload = ({ subjectId }) => {
     const [error, setError] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState({});
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     useEffect(() => {
+        checkAuth();
         fetchUploadedFiles();
     }, [subjectId]);
 
+    const checkAuth = async () => {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            console.log('Estado de la sesión:', session);
+            if (error) {
+                console.error('Error al verificar sesión:', error);
+                throw error;
+            }
+            setIsAuthenticated(!!session);
+        } catch (error) {
+            console.error('Error checking auth:', error);
+            setIsAuthenticated(false);
+        }
+    };
+
     const fetchUploadedFiles = async () => {
         try {
+            console.log('Intentando obtener archivos para subjectId:', subjectId);
             const { data, error } = await supabase
                 .from('syllabi')
                 .select('*')
                 .eq('subject_id', subjectId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error al obtener archivos:', error);
+                throw error;
+            }
+            console.log('Archivos obtenidos:', data);
             setUploadedFiles(data || []);
         } catch (error) {
             console.error('Error fetching files:', error);
@@ -29,6 +51,11 @@ const SyllabusUpload = ({ subjectId }) => {
     };
 
     const handleFileChange = (event) => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para subir archivos');
+            return;
+        }
+
         const selectedFiles = Array.from(event.target.files);
         const validFiles = selectedFiles.filter(file => {
             const validTypes = [
@@ -54,6 +81,11 @@ const SyllabusUpload = ({ subjectId }) => {
     };
 
     const handleUpload = async () => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para subir archivos');
+            return;
+        }
+
         if (files.length === 0) {
             setError('Por favor, selecciona al menos un archivo');
             return;
@@ -63,36 +95,10 @@ const SyllabusUpload = ({ subjectId }) => {
         setError(null);
 
         try {
-            // Verificar si existe el bucket
-            const { data: buckets } = await supabase.storage.listBuckets();
-            const documentsBucket = buckets.find(b => b.name === 'documents');
-
-            if (!documentsBucket) {
-                try {
-                    await supabase.storage.createBucket('documents', {
-                        public: true
-                    });
-                } catch (error) {
-                    if (error.message.includes('policy')) {
-                        setError('No tienes permisos para crear el almacenamiento. Por favor, contacta al administrador.');
-                    } else {
-                        throw error;
-                    }
-                    return;
-                }
-            }
-
-            // Verificar si existe la carpeta syllabi
-            const { data: folders } = await supabase.storage
-                .from('documents')
-                .list('syllabi');
-
-            if (!folders || folders.length === 0) {
-                // Crear un archivo temporal para forzar la creación de la carpeta
-                await supabase.storage
-                    .from('documents')
-                    .upload('syllabi/.placeholder', new Blob(['']));
-            }
+            // Verificar la sesión antes de subir
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!session) throw new Error('No hay sesión activa');
 
             // Subir cada archivo
             for (let i = 0; i < files.length; i++) {
@@ -103,6 +109,7 @@ const SyllabusUpload = ({ subjectId }) => {
 
                 setProgress(prev => ({ ...prev, [fileName]: 0 }));
 
+                // Subir archivo al storage
                 const { error: uploadError } = await supabase.storage
                     .from('documents')
                     .upload(filePath, file, {
@@ -110,12 +117,17 @@ const SyllabusUpload = ({ subjectId }) => {
                         upsert: false
                     });
 
-                if (uploadError) throw uploadError;
+                if (uploadError) {
+                    console.error('Error al subir archivo:', uploadError);
+                    throw new Error('Error al subir el archivo al almacenamiento');
+                }
 
+                // Obtener URL pública
                 const { data: { publicUrl } } = supabase.storage
                     .from('documents')
                     .getPublicUrl(filePath);
 
+                // Guardar en la base de datos
                 const { error: dbError } = await supabase
                     .from('syllabi')
                     .insert([
@@ -128,7 +140,10 @@ const SyllabusUpload = ({ subjectId }) => {
                         }
                     ]);
 
-                if (dbError) throw dbError;
+                if (dbError) {
+                    console.error('Error al guardar en la base de datos:', dbError);
+                    throw new Error('Error al guardar la información del archivo');
+                }
 
                 setProgress(prev => ({ ...prev, [fileName]: 100 }));
             }
@@ -138,13 +153,18 @@ const SyllabusUpload = ({ subjectId }) => {
             setProgress({});
         } catch (error) {
             console.error('Error uploading files:', error);
-            setError('Error al subir los archivos');
+            setError(error.message || 'Error al subir los archivos');
         } finally {
             setUploading(false);
         }
     };
 
     const handleDelete = async (fileId) => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para eliminar archivos');
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('syllabi')
@@ -167,6 +187,16 @@ const SyllabusUpload = ({ subjectId }) => {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
+
+    if (!isAuthenticated) {
+        return (
+            <div className="syllabus-upload-container">
+                <div className="error-message">
+                    Debes iniciar sesión para subir y gestionar archivos.
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="syllabus-upload-container">

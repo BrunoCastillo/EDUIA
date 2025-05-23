@@ -49,55 +49,54 @@ class SubjectService {
             }
 
             // Verificar si el usuario existe en nuestra tabla users
-            const { data: existingUser, error: userError } = await supabase
+            const { data: existingUserById, error: userErrorById } = await supabase
                 .from('users')
                 .select('*')
                 .eq('id', user.id)
                 .single();
 
-            console.log('Búsqueda de usuario existente:', { existingUser, userError });
+            let userIdToUse = user.id;
 
-            if (userError || !existingUser) {
-                console.log('Creando nuevo usuario en la tabla users...');
-                
-                // Obtener el perfil del usuario de auth.users
-                const { data: authUser, error: authUserError } = await supabase
-                    .from('auth.users')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
-
-                console.log('Datos del usuario de auth:', { authUser, authUserError });
-
-                // Crear el usuario en nuestra tabla
-                const newUser = {
-                    id: user.id,
-                    email: user.email,
-                    full_name: user.user_metadata?.full_name || user.email,
-                    role: 'professor'
-                };
-
-                console.log('Intentando crear usuario con datos:', newUser);
-
-                const { data: insertedUser, error: insertError } = await supabase
+            if (userErrorById || !existingUserById) {
+                // Buscar por email antes de crear
+                const { data: existingUserByEmail, error: userErrorByEmail } = await supabase
                     .from('users')
-                    .insert([newUser])
-                    .select()
+                    .select('*')
+                    .eq('email', user.email)
                     .single();
 
-                if (insertError) {
-                    console.error('Error al crear usuario:', insertError);
-                    throw new Error(`Error al sincronizar el usuario: ${insertError.message}`);
+                if (existingUserByEmail) {
+                    // Si existe por email, usar ese usuario
+                    userIdToUse = existingUserByEmail.id;
+                    console.log('Usuario ya existe por email, usando id:', userIdToUse);
+                } else {
+                    // Crear el usuario en nuestra tabla
+                    const newUser = {
+                        id: user.id,
+                        email: user.email,
+                        full_name: user.user_metadata?.full_name || user.email,
+                        role: 'professor'
+                    };
+                    console.log('Intentando crear usuario con datos:', newUser);
+                    const { data: insertedUser, error: insertError } = await supabase
+                        .from('users')
+                        .insert([newUser])
+                        .select()
+                        .single();
+                    if (insertError) {
+                        console.error('Error al crear usuario:', insertError);
+                        throw new Error(`Error al sincronizar el usuario: ${insertError.message}`);
+                    }
+                    userIdToUse = insertedUser.id;
+                    console.log('Usuario creado exitosamente:', insertedUser);
                 }
-
-                console.log('Usuario creado exitosamente:', insertedUser);
             }
 
             // Verificar nuevamente que el usuario existe
             const { data: finalUser, error: finalUserError } = await supabase
                 .from('users')
                 .select('id')
-                .eq('id', user.id)
+                .eq('id', userIdToUse)
                 .single();
 
             if (finalUserError || !finalUser) {

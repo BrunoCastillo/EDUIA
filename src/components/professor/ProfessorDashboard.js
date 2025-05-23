@@ -3,6 +3,7 @@ import { supabase } from '../../config/supabaseClient';
 import SubjectList from './SubjectList';
 import SubjectForm from './SubjectForm';
 import FileUpload from './FileUpload';
+import PDFUpload from './PDFUpload';
 import './ProfessorDashboard.css';
 
 const ProfessorDashboard = () => {
@@ -11,6 +12,7 @@ const ProfessorDashboard = () => {
     const [showForm, setShowForm] = useState(false);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [activeOption, setActiveOption] = useState('details'); // 'details', 'chat', 'files'
 
     useEffect(() => {
         fetchSubjects();
@@ -52,6 +54,36 @@ const ProfessorDashboard = () => {
         setShowForm(false);
     };
 
+    const renderOptionContent = () => {
+        switch (activeOption) {
+            case 'chat':
+                return (
+                    <div className="option-content">
+                        <h3>Chat con IA</h3>
+                        {/* Aquí irá el componente del chat con IA */}
+                        <p>Funcionalidad de chat con IA en desarrollo...</p>
+                    </div>
+                );
+            case 'files':
+                return (
+                    <div className="option-content">
+                        <h3>Carga de Archivos</h3>
+                        <PDFUpload subjectId={selectedSubject?.id} />
+                        <FileUpload subjectId={selectedSubject?.id} />
+                    </div>
+                );
+            default:
+                return (
+                    <div className="subject-info">
+                        <h3>{selectedSubject.name}</h3>
+                        <p><strong>Código:</strong> {selectedSubject.code}</p>
+                        <p><strong>Créditos:</strong> {selectedSubject.credits}</p>
+                        <p><strong>Descripción:</strong> {selectedSubject.description}</p>
+                    </div>
+                );
+        }
+    };
+
     if (loading) {
         return <div className="loading">Cargando...</div>;
     }
@@ -83,17 +115,29 @@ const ProfessorDashboard = () => {
                             onCancel={() => setShowForm(false)}
                         />
                     ) : selectedSubject ? (
-                        <div className="subject-info">
-                            <h3>{selectedSubject.name}</h3>
-                            <p><strong>Código:</strong> {selectedSubject.code}</p>
-                            <p><strong>Créditos:</strong> {selectedSubject.credits}</p>
-                            <p><strong>Descripción:</strong> {selectedSubject.description}</p>
-                            
-                            <div className="documents-section">
-                                <h4>Documentos de la Materia</h4>
-                                <FileUpload subjectId={selectedSubject.id} />
+                        <>
+                            <div className="options-menu">
+                                <button
+                                    className={`option-button ${activeOption === 'details' ? 'active' : ''}`}
+                                    onClick={() => setActiveOption('details')}
+                                >
+                                    Detalles
+                                </button>
+                                <button
+                                    className={`option-button ${activeOption === 'chat' ? 'active' : ''}`}
+                                    onClick={() => setActiveOption('chat')}
+                                >
+                                    Chat con IA
+                                </button>
+                                <button
+                                    className={`option-button ${activeOption === 'files' ? 'active' : ''}`}
+                                    onClick={() => setActiveOption('files')}
+                                >
+                                    Carga de Archivos
+                                </button>
                             </div>
-                        </div>
+                            {renderOptionContent()}
+                        </>
                     ) : (
                         <div className="no-subject-selected">
                             <p>Selecciona una materia para ver sus detalles y documentos</p>

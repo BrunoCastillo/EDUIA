@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Configuración de Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // Configuración de DeepSeek
 const deepseekApiKey = process.env.REACT_APP_DEEPSEEK_API_KEY;
@@ -27,7 +27,7 @@ if (!supabaseUrl || !supabaseKey) {
     console.error('Error: Las variables de entorno de Supabase no están configuradas.');
     console.error('Variables actuales:');
     console.error('REACT_APP_SUPABASE_URL:', supabaseUrl);
-    console.error('REACT_APP_SUPABASE_KEY existe:', !!supabaseKey);
+    console.error('REACT_APP_SUPABASE_ANON_KEY existe:', !!supabaseKey);
     console.error('Asegúrate de que:');
     console.error('1. El archivo .env existe en la raíz del proyecto');
     console.error('2. Las variables comienzan con REACT_APP_');

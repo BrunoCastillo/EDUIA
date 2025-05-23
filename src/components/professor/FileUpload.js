@@ -1,28 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 import './FileUpload.css';
 
-const FileUpload = ({ subjectId }) => {
+// Configurar el worker de PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+const FileUpload = ({ subjectId, session: sessionProp }) => {
+    const navigate = useNavigate();
     const [files, setFiles] = useState([]);
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [error, setError] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState({});
     const [selectedFolder, setSelectedFolder] = useState('documents');
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [session, setSession] = useState(null);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [numPages, setNumPages] = useState(null);
+    const [pageNumber, setPageNumber] = useState(1);
+    const [showPdfViewer, setShowPdfViewer] = useState(false);
 
     useEffect(() => {
-        fetchUploadedFiles();
-    }, [selectedFolder, subjectId]);
+        checkAuth();
+    }, [sessionProp]);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchUploadedFiles();
+        }
+    }, [selectedFolder, subjectId, isAuthenticated]);
+
+    const checkAuth = async () => {
+        try {
+            setIsLoading(true);
+            let currentSession = sessionProp;
+            if (!currentSession) {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('Error al verificar sesión:', error);
+                    throw error;
+                }
+                currentSession = session;
+            }
+            console.log('[FileUpload] Sesión recibida:', currentSession);
+            setSession(currentSession);
+            if (!currentSession) {
+                console.log('[FileUpload] No hay sesión activa, redirigiendo a login...');
+                navigate('/login');
+                return;
+            }
+            setIsAuthenticated(true);
+        } catch (error) {
+            console.error('[FileUpload] Error checking auth:', error);
+            setIsAuthenticated(false);
+            navigate('/login');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const fetchUploadedFiles = async () => {
         try {
+            console.log('Intentando obtener archivos para subjectId:', subjectId);
             const { data, error } = await supabase
                 .from('files')
                 .select('*')
                 .eq('folder', selectedFolder)
-                .eq('subject_id', subjectId);
+                .eq('subject_id', subjectId)
+                .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error al obtener archivos:', error);
+                throw error;
+            }
+            console.log('Archivos obtenidos:', data);
             setUploadedFiles(data || []);
         } catch (error) {
             console.error('Error al cargar archivos:', error);
@@ -31,6 +87,11 @@ const FileUpload = ({ subjectId }) => {
     };
 
     const handleFileChange = (event) => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para subir archivos');
+            return;
+        }
+
         const selectedFiles = Array.from(event.target.files);
         const validFiles = selectedFiles.filter(file => {
             const validTypes = [
@@ -59,6 +120,11 @@ const FileUpload = ({ subjectId }) => {
     };
 
     const handleUpload = async () => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para subir archivos');
+            return;
+        }
+
         if (files.length === 0) {
             setError('Por favor, selecciona al menos un archivo');
             return;
@@ -68,23 +134,10 @@ const FileUpload = ({ subjectId }) => {
         setError(null);
 
         try {
-            // Verificar si existe el bucket
-            const { data: buckets } = await supabase.storage.listBuckets();
-            const documentsBucket = buckets.find(b => b.name === 'documents');
-
-            if (!documentsBucket) {
-                try {
-                    await supabase.storage.createBucket('documents', {
-                        public: true
-                    });
-                } catch (error) {
-                    if (error.message.includes('policy')) {
-                        setError('No tienes permisos para crear el almacenamiento. Por favor, contacta al administrador.');
-                        return;
-                    }
-                    throw error;
-                }
-            }
+            // Verificar la sesión antes de subir
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!session) throw new Error('No hay sesión activa');
 
             // Subir cada archivo
             for (let i = 0; i < files.length; i++) {
@@ -93,13 +146,9 @@ const FileUpload = ({ subjectId }) => {
                 const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
                 const filePath = `${selectedFolder}/${fileName}`;
 
-                // Actualizar progreso
-                setProgress(prev => ({
-                    ...prev,
-                    [fileName]: 0
-                }));
+                setProgress(prev => ({ ...prev, [fileName]: 0 }));
 
-                // Subir archivo
+                // Subir archivo al storage
                 const { error: uploadError } = await supabase.storage
                     .from('documents')
                     .upload(filePath, file, {
@@ -107,64 +156,67 @@ const FileUpload = ({ subjectId }) => {
                         upsert: false
                     });
 
-                if (uploadError) throw uploadError;
+                if (uploadError) {
+                    console.error('Error al subir archivo:', uploadError);
+                    throw new Error('Error al subir el archivo al almacenamiento');
+                }
 
-                // Insertar en la base de datos
+                // Obtener URL pública
+                const { data: { publicUrl } } = supabase.storage
+                    .from('documents')
+                    .getPublicUrl(filePath);
+
+                // Guardar en la base de datos
                 const { error: dbError } = await supabase
                     .from('files')
                     .insert([
                         {
+                            subject_id: subjectId,
                             name: file.name,
                             path: filePath,
                             type: file.type,
                             size: file.size,
-                            folder: selectedFolder,
-                            subject_id: subjectId
+                            folder: selectedFolder
                         }
                     ]);
 
-                if (dbError) throw dbError;
+                if (dbError) {
+                    console.error('Error al guardar en la base de datos:', dbError);
+                    throw new Error('Error al guardar la información del archivo');
+                }
 
-                // Actualizar progreso
-                setProgress(prev => ({
-                    ...prev,
-                    [fileName]: 100
-                }));
+                setProgress(prev => ({ ...prev, [fileName]: 100 }));
             }
 
-            // Limpiar archivos y actualizar lista
+            await fetchUploadedFiles();
             setFiles([]);
-            fetchUploadedFiles();
+            setProgress({});
         } catch (error) {
             console.error('Error al subir archivos:', error);
-            setError('Error al subir los archivos. Por favor, intenta de nuevo.');
+            setError(error.message || 'Error al subir los archivos');
         } finally {
             setUploading(false);
         }
     };
 
-    const handleDelete = async (fileId, filePath) => {
+    const handleDelete = async (fileId) => {
+        if (!isAuthenticated) {
+            setError('Debes iniciar sesión para eliminar archivos');
+            return;
+        }
+
         try {
-            // Eliminar de storage
-            const { error: storageError } = await supabase.storage
-                .from('documents')
-                .remove([filePath]);
-
-            if (storageError) throw storageError;
-
-            // Eliminar de la base de datos
-            const { error: dbError } = await supabase
+            const { error } = await supabase
                 .from('files')
                 .delete()
                 .eq('id', fileId);
 
-            if (dbError) throw dbError;
+            if (error) throw error;
 
-            // Actualizar lista
-            fetchUploadedFiles();
+            await fetchUploadedFiles();
         } catch (error) {
             console.error('Error al eliminar archivo:', error);
-            setError('Error al eliminar el archivo. Por favor, intenta de nuevo.');
+            setError('Error al eliminar el archivo');
         }
     };
 
@@ -176,6 +228,59 @@ const FileUpload = ({ subjectId }) => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const handleViewFile = async (file) => {
+        try {
+            // Obtener la URL pública del archivo
+            const { data: { publicUrl } } = supabase.storage
+                .from('documents')
+                .getPublicUrl(file.path);
+
+            setSelectedFile(publicUrl);
+            setShowPdfViewer(true);
+        } catch (error) {
+            console.error('Error al cargar el archivo:', error);
+            setError('Error al cargar el archivo para visualización');
+        }
+    };
+
+    const onDocumentLoadSuccess = ({ numPages }) => {
+        setNumPages(numPages);
+        setPageNumber(1);
+    };
+
+    const changePage = (offset) => {
+        setPageNumber(prevPageNumber => prevPageNumber + offset);
+    };
+
+    const previousPage = () => changePage(-1);
+    const nextPage = () => changePage(1);
+
+    if (isLoading) {
+        return (
+            <div className="file-upload-container">
+                <div className="loading-message">
+                    Verificando autenticación...
+                </div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="file-upload-container">
+                <div className="error-message">
+                    Debes iniciar sesión para subir y gestionar archivos.
+                    <button 
+                        onClick={() => navigate('/login')}
+                        className="login-button"
+                    >
+                        Ir a inicio de sesión
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="file-upload-container">
             <div className="folder-selector">
@@ -186,7 +291,7 @@ const FileUpload = ({ subjectId }) => {
                     onChange={(e) => setSelectedFolder(e.target.value)}
                 >
                     <option value="documents">Documentos</option>
-                    <option value="syllabi">Programas</option>
+                    <option value="assignments">Tareas</option>
                     <option value="resources">Recursos</option>
                 </select>
             </div>
@@ -196,10 +301,9 @@ const FileUpload = ({ subjectId }) => {
                     type="file"
                     multiple
                     onChange={handleFileChange}
-                    className="file-input"
                     accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
                 />
-                <button
+                <button 
                     onClick={handleUpload}
                     disabled={uploading || files.length === 0}
                     className="upload-button"
@@ -210,29 +314,29 @@ const FileUpload = ({ subjectId }) => {
 
             {error && <div className="error-message">{error}</div>}
 
-            {files.length > 0 && (
-                <div className="files-queue">
-                    <h4>Archivos a subir:</h4>
-                    <div className="files-list">
-                        {files.map((file, index) => (
-                            <div key={index} className="file-item">
-                                <div className="file-details">
-                                    <span className="file-name">{file.name}</span>
-                                    <span className="file-type">{file.type}</span>
-                                    <span className="file-size">{formatFileSize(file.size)}</span>
-                                    {progress[file.name] !== undefined && (
-                                        <div className="progress-bar">
-                                            <div
-                                                className="progress-fill"
-                                                style={{ width: `${progress[file.name]}%` }}
-                                            />
-                                        </div>
-                                    )}
+            <div className="files-list">
+                <h3>Archivos subidos:</h3>
+                {uploadedFiles.length === 0 ? (
+                    <p>No hay archivos subidos</p>
+                ) : (
+                    <div className="files-grid">
+                        {uploadedFiles.map((file) => (
+                            <div key={file.id} className="file-card">
+                                <div className="file-info">
+                                    <h4>{file.name}</h4>
+                                    <p>Tamaño: {formatFileSize(file.size)}</p>
+                                    <p>Fecha: {new Date(file.created_at).toLocaleDateString()}</p>
                                 </div>
                                 <div className="file-actions">
-                                    <button
-                                        onClick={() => removeFile(index)}
-                                        className="remove-button"
+                                    <button 
+                                        onClick={() => handleViewFile(file)}
+                                        className="view-button"
+                                    >
+                                        Ver
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDelete(file.id)}
+                                        className="delete-button"
                                     >
                                         Eliminar
                                     </button>
@@ -240,36 +344,60 @@ const FileUpload = ({ subjectId }) => {
                             </div>
                         ))}
                     </div>
+                )}
+            </div>
+
+            {showPdfViewer && selectedFile && (
+                <div className="pdf-viewer-modal">
+                    <div className="pdf-viewer-content">
+                        <div className="pdf-controls">
+                            <button onClick={previousPage} disabled={pageNumber <= 1}>
+                                Anterior
+                            </button>
+                            <span>
+                                Página {pageNumber} de {numPages}
+                            </span>
+                            <button onClick={nextPage} disabled={pageNumber >= numPages}>
+                                Siguiente
+                            </button>
+                            <button 
+                                onClick={() => setShowPdfViewer(false)}
+                                className="close-button"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                        <Document
+                            file={selectedFile}
+                            onLoadSuccess={onDocumentLoadSuccess}
+                            className="pdf-document"
+                        >
+                            <Page 
+                                pageNumber={pageNumber} 
+                                renderTextLayer={false}
+                                renderAnnotationLayer={false}
+                            />
+                        </Document>
+                    </div>
                 </div>
             )}
 
-            {uploadedFiles.length > 0 && (
-                <div className="uploaded-files">
-                    <h4>Archivos subidos:</h4>
-                    <div className="files-list">
-                        {uploadedFiles.map((file) => (
-                            <div key={file.id} className="file-item">
-                                <div className="file-details">
-                                    <span className="file-name">{file.name}</span>
-                                    <span className="file-type">{file.type}</span>
-                                    <span className="file-size">{formatFileSize(file.size)}</span>
+            {files.length > 0 && (
+                <div className="selected-files">
+                    <h3>Archivos seleccionados:</h3>
+                    <div className="files-grid">
+                        {files.map((file, index) => (
+                            <div key={index} className="file-card">
+                                <div className="file-info">
+                                    <h4>{file.name}</h4>
+                                    <p>Tamaño: {formatFileSize(file.size)}</p>
                                 </div>
-                                <div className="file-actions">
-                                    <a
-                                        href={`${supabase.storage.from('documents').getPublicUrl(file.path).data.publicUrl}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="view-button"
-                                    >
-                                        Ver
-                                    </a>
-                                    <button
-                                        onClick={() => handleDelete(file.id, file.path)}
-                                        className="delete-button"
-                                    >
-                                        Eliminar
-                                    </button>
-                                </div>
+                                <button 
+                                    onClick={() => removeFile(index)}
+                                    className="remove-button"
+                                >
+                                    Eliminar
+                                </button>
                             </div>
                         ))}
                     </div>

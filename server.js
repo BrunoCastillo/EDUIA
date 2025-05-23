@@ -29,17 +29,29 @@ if (!fs.existsSync(uploadsDir)) {
 // Configuración de multer para guardar en 'uploads'
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+  filename: (req, file, cb) => {
+    // Sanitizar el nombre del archivo
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${Date.now()}-${sanitizedName}`);
+  }
 });
 const upload = multer({ storage });
 
 // Ruta para subir archivos
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  
   // Devuelve la URL y la ruta del archivo
+  const fileUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+  console.log('Archivo subido:', {
+    filename: req.file.filename,
+    path: req.file.path,
+    url: fileUrl
+  });
+  
   res.json({
-    fileUrl: `http://localhost:3001/uploads/${req.file.filename}`,
-    filePath: path.join('uploads', req.file.filename)
+    fileUrl: fileUrl,
+    filePath: req.file.filename // Solo el nombre del archivo
   });
 });
 

@@ -6,8 +6,8 @@ import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import './FileUpload.css';
 
-// Configurar el worker de PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configurar el worker de PDF.js con la versión compatible
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js`;
 
 const FileUpload = ({ subjectId, session: sessionProp }) => {
     const navigate = useNavigate();
@@ -142,9 +142,8 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
             // Subir cada archivo
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-                const filePath = `${selectedFolder}/${fileName}`;
+                const fileName = `${Date.now()}-${file.name}`;
+                const filePath = fileName; // Guardamos solo el nombre del archivo
 
                 setProgress(prev => ({ ...prev, [fileName]: 0 }));
 
@@ -160,11 +159,6 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
                     console.error('Error al subir archivo:', uploadError);
                     throw new Error('Error al subir el archivo al almacenamiento');
                 }
-
-                // Obtener URL pública
-                const { data: { publicUrl } } = supabase.storage
-                    .from('documents')
-                    .getPublicUrl(filePath);
 
                 // Guardar en la base de datos
                 const { error: dbError } = await supabase
@@ -199,24 +193,40 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
         }
     };
 
-    const handleDelete = async (fileId) => {
+    const handleDelete = async (fileId, filePath) => {
         if (!isAuthenticated) {
             setError('Debes iniciar sesión para eliminar archivos');
             return;
         }
 
         try {
-            const { error } = await supabase
+            // Primero eliminar el archivo del storage
+            const { error: storageError } = await supabase.storage
+                .from('documents')
+                .remove([filePath]);
+
+            if (storageError) {
+                console.error('Error al eliminar archivo del storage:', storageError);
+                throw new Error('Error al eliminar el archivo del almacenamiento');
+            }
+
+            // Luego eliminar el registro de la base de datos
+            const { error: dbError } = await supabase
                 .from('files')
                 .delete()
                 .eq('id', fileId);
 
-            if (error) throw error;
+            if (dbError) {
+                console.error('Error al eliminar registro de la base de datos:', dbError);
+                throw new Error('Error al eliminar el registro del archivo');
+            }
 
+            // Actualizar la lista de archivos
             await fetchUploadedFiles();
+            setError(null);
         } catch (error) {
             console.error('Error al eliminar archivo:', error);
-            setError('Error al eliminar el archivo');
+            setError('Error al eliminar el archivo: ' + error.message);
         }
     };
 
@@ -230,12 +240,12 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
 
     const handleViewFile = async (file) => {
         try {
-            // Obtener la URL pública del archivo
-            const { data: { publicUrl } } = supabase.storage
-                .from('documents')
-                .getPublicUrl(file.path);
-
-            setSelectedFile(publicUrl);
+            // Construir la URL del archivo correctamente
+            const fileName = file.path.split('/').pop();
+            const fileUrl = `http://localhost:3001/uploads/${fileName}`;
+            console.log('Intentando cargar archivo desde:', fileUrl);
+            
+            setSelectedFile(fileUrl);
             setShowPdfViewer(true);
         } catch (error) {
             console.error('Error al cargar el archivo:', error);
@@ -335,7 +345,7 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
                                         Ver
                                     </button>
                                     <button 
-                                        onClick={() => handleDelete(file.id)}
+                                        onClick={() => handleDelete(file.id, file.path)}
                                         className="delete-button"
                                     >
                                         Eliminar
@@ -355,9 +365,9 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
                                 Anterior
                             </button>
                             <span>
-                                Página {pageNumber} de {numPages}
+                                Página {pageNumber} de {numPages || '?'}
                             </span>
-                            <button onClick={nextPage} disabled={pageNumber >= numPages}>
+                            <button onClick={nextPage} disabled={pageNumber >= (numPages || 1)}>
                                 Siguiente
                             </button>
                             <button 
@@ -370,12 +380,27 @@ const FileUpload = ({ subjectId, session: sessionProp }) => {
                         <Document
                             file={selectedFile}
                             onLoadSuccess={onDocumentLoadSuccess}
+                            onLoadError={(error) => {
+                                console.error('Error al cargar el PDF:', error);
+                                setError('Error al cargar el PDF. Por favor, intenta nuevamente.');
+                                setShowPdfViewer(false);
+                            }}
+                            loading={
+                                <div className="pdf-loading">
+                                    Cargando documento...
+                                </div>
+                            }
                             className="pdf-document"
                         >
                             <Page 
                                 pageNumber={pageNumber} 
                                 renderTextLayer={false}
                                 renderAnnotationLayer={false}
+                                loading={
+                                    <div className="pdf-loading">
+                                        Cargando página...
+                                    </div>
+                                }
                             />
                         </Document>
                     </div>

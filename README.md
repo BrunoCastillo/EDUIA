@@ -12,12 +12,12 @@
 
 ###  Características Principales
 
-- ** Chat Inteligente**: Interacción con IA basada en contenido educativo específico
-- ** Gestión de Contenido**: Subida y procesamiento de PDFs y sílabos
-- ** Panel de Profesores**: Herramientas para gestión de asignaturas y contenido
-- ** Portal de Estudiantes**: Acceso a evaluaciones y material de estudio
-- ** Búsqueda Semántica**: Utilizando embeddings y pgvector para búsquedas inteligentes
-- ** Sistema de Evaluaciones**: Generación automática de preguntas y evaluaciones
+- Chat Inteligente: Interacción con IA basada en contenido educativo específico
+- Gestión de Contenido: Subida y procesamiento de PDFs y sílabos
+- Panel de Profesores: Herramientas para gestión de asignaturas y contenido
+- Portal de Estudiantes: Acceso a evaluaciones y material de estudio
+- Búsqueda Semántica: Utilizando embeddings y pgvector para búsquedas inteligentes
+- Sistema de Evaluaciones: Generación automática de preguntas y evaluaciones
 
 ##  Tecnologías Utilizadas
 

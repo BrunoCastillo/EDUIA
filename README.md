@@ -6,20 +6,20 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.x-blue.svg)](https://postgresql.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-green.svg)](https://supabase.com/)
 
-## 📋 Descripción
+##  Descripción
 
 **EDUIA** es un sistema educativo inteligente desarrollado como Trabajo Final de Máster (TFE) que integra tecnologías de Inteligencia Artificial para mejorar la experiencia de aprendizaje. El sistema utiliza técnicas de RAG (Retrieval Augmented Generation) para proporcionar respuestas contextualizadas basadas en material educativo.
 
-### 🎯 Características Principales
+###  Características Principales
 
-- **🤖 Chat Inteligente**: Interacción con IA basada en contenido educativo específico
-- **📚 Gestión de Contenido**: Subida y procesamiento de PDFs y sílabos
-- **👨‍🏫 Panel de Profesores**: Herramientas para gestión de asignaturas y contenido
-- **👨‍🎓 Portal de Estudiantes**: Acceso a evaluaciones y material de estudio
-- **🔍 Búsqueda Semántica**: Utilizando embeddings y pgvector para búsquedas inteligentes
-- **📊 Sistema de Evaluaciones**: Generación automática de preguntas y evaluaciones
+- ** Chat Inteligente**: Interacción con IA basada en contenido educativo específico
+- ** Gestión de Contenido**: Subida y procesamiento de PDFs y sílabos
+- ** Panel de Profesores**: Herramientas para gestión de asignaturas y contenido
+- ** Portal de Estudiantes**: Acceso a evaluaciones y material de estudio
+- ** Búsqueda Semántica**: Utilizando embeddings y pgvector para búsquedas inteligentes
+- ** Sistema de Evaluaciones**: Generación automática de preguntas y evaluaciones
 
-## 🛠️ Tecnologías Utilizadas
+##  Tecnologías Utilizadas
 
 ### Frontend
 - **React.js** - Interfaz de usuario
@@ -38,7 +38,7 @@
 - **Embeddings** - Procesamiento de texto para búsqueda semántica
 - **RAG (Retrieval Augmented Generation)** - Arquitectura de IA contextual
 
-## 🚀 Instalación
+##  Instalación
 
 ### Prerrequisitos
 - Node.js 18.x o superior
@@ -48,8 +48,8 @@
 
 ### 1. Clonar el Repositorio
 ```bash
-git clone --recursive https://github.com/BrunoCastillo/EDUIA-TFE.git
-cd EDUIA-TFE
+git clone --recursive https://github.com/BrunoCastillo/EDUIA.git
+cd EDUIA
 ```
 
 ### 2. Instalar Dependencias
@@ -149,7 +149,7 @@ EDUIA-TFE/
 └── README.md
 ```
 
-## 🎯 Funcionalidades Principales
+## Funcionalidades Principales
 
 ### Para Profesores
 - ✅ Gestión de asignaturas
@@ -187,7 +187,7 @@ EDUIA-TFE/
 - `generate_embeddings()` - Generación de embeddings
 - Políticas RLS (Row Level Security)
 
-## 🔐 Seguridad
+## Seguridad
 
 - **Autenticación**: Supabase Auth
 - **Autorización**: Row Level Security (RLS)
@@ -195,7 +195,7 @@ EDUIA-TFE/
 - **Encriptación**: HTTPS en producción
 - **Gestión de Archivos**: Validación de tipos y tamaños
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Ejecutar tests
@@ -215,7 +215,7 @@ npm run test:integration
 - **Compresión**: Gzip habilitado
 - **CDN**: Para archivos estáticos
 
-## 🤝 Contribución
+## Contribución
 
 1. Fork el proyecto
 2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
@@ -223,9 +223,9 @@ npm run test:integration
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abrir un Pull Request
 
-## 📝 Changelog
+## Changelog
 
-### v1.0.0 (2024-01-XX)
+### v1.0.0 
 - ✅ Implementación inicial del sistema
 - ✅ Integración con DeepSeek API
 - ✅ Sistema de RAG funcional
@@ -233,30 +233,17 @@ npm run test:integration
 - ✅ Subida y procesamiento de PDFs
 - ✅ Chat inteligente contextualizado
 
-## 🐛 Issues Conocidos
+## Issues Conocidos
 
 - Limitación de tamaño de archivos PDF (100MB)
 - Tiempo de procesamiento para documentos grandes
 - Compatibilidad limitada con algunos formatos PDF
 
-## 📄 Licencia
+##  Licencia
 
 Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
 
-## 👨‍💻 Autor
-
-**Bruno Castillo**
-- GitHub: [@BrunoCastillo](https://github.com/BrunoCastillo)
-- Email: [tu-email@ejemplo.com](mailto:tu-email@ejemplo.com)
-
-## 🙏 Agradecimientos
-
-- Universidad por el apoyo en el desarrollo del TFE
-- Comunidad de Open Source por las herramientas utilizadas
-- Supabase por la infraestructura backend
-- OpenAI y DeepSeek por las APIs de IA
-
-## 📊 Estadísticas del Proyecto
+## Estadísticas del Proyecto
 
 - **Lenguajes**: JavaScript (75.4%), CSS (23.0%), PLpgSQL (1.3%), HTML (0.3%)
 - **Commits**: 50+ commits
@@ -265,4 +252,4 @@ Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](L
 
 ---
 
-*Desarrollado como Trabajo Final de Máster - 2024* 
+*Desarrollado como Trabajo Final de Máster - 2025* 
